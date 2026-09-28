@@ -53,6 +53,8 @@ export const TUNING = {
      * (enemyHp * enemyAtk) / (unitPower * unitHealth) — smooth in every stat.
      */
     contactRate: 3.2,
+    /** Slower grind at the finale so fortress / boss fights last a few dramatic seconds. */
+    finaleContactRate: 2.2,
     gruntBaseHp: 10,
     gruntBaseAtk: 10,
     gruntSpeed: 58,

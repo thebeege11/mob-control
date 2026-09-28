@@ -108,7 +108,7 @@ export class Simulation {
     this.units.reset(plan.player, 0);
     this.units.addSoldiers(plan.player.startUnits, 0, 0, this.rng);
     // Settle the starting blob into formation instantly.
-    for (let i = 0; i < 30; i++) this.units.update(1 / 60, 0, false, Infinity, false);
+    for (let i = 0; i < 30; i++) this.units.update(1 / 60, 0, false, Infinity);
     this.maxSoldiers = this.units.soldiers;
     const enemies: EnemySpec[] = [];
     this.hints = [];
@@ -161,7 +161,7 @@ export class Simulation {
     if (this.phase === 'victory') {
       this.victoryTimer -= dt;
       u.cy += 260 * dt;
-      u.update(dt, 260, false, Infinity, false);
+      u.update(dt, 260, false, Infinity);
       if (this.victoryTimer <= 0) {
         this.phase = 'won';
         this.events.push(Ev.Win);
@@ -195,9 +195,10 @@ export class Simulation {
         this.score.add(S.distancePer100, 0, 0, false);
       }
     } else {
-      // Arena: the centre eases up to the face; units charge into it.
-      const stop = face - 60;
-      u.cy += clamp(stop - u.cy, -200 * dt, 200 * dt);
+      // Arena: the whole crowd charges the face; separation turns it into a
+      // queue that feeds forward as the front row falls.
+      const stop = face - 40;
+      u.cy += clamp(stop - u.cy, -220 * dt, 220 * dt);
     }
     u.update(dt, forward, this.input.squeeze, face, f.arena);
 
@@ -208,7 +209,7 @@ export class Simulation {
     // ---- Hints ----
     while (this.hintIdx < this.hints.length && this.hints[this.hintIdx].y < u.cy + 420) {
       const h = this.hints[this.hintIdx++];
-      if (this.hintFilter(h.key)) this.events.push(Ev.Hint, 0, h.y, 0, 0, h.text);
+      if (this.hintFilter(h.key)) this.events.push(Ev.Hint, 0, h.y, 0, 0, h.key + '|' + h.text);
     }
 
     // ---- World systems ----

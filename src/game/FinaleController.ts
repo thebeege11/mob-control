@@ -127,7 +127,7 @@ export class FinaleController {
     // ---- Contact damage (units grind against the face) ----
     const face = f.y;
     const half = f.width / 2;
-    const rate = TUNING.combat.contactRate * dt;
+    const rate = TUNING.combat.finaleContactRate * dt;
     let dealt = 0;
     for (let i = 0; i < units.count; i++) {
       const u = units.units[i];

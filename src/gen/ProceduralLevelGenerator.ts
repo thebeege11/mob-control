@@ -140,6 +140,7 @@ export class ProceduralLevelGenerator {
           targetArmy: ref.startUnits * lerp(G.targetGrowthStart, G.targetGrowthEnd, progress) * (1 + D * G.targetGrowthPerD),
           ref,
           enemyHpMult: dr.enemyHpMult,
+          refHpMult: dr.progressionScaling,
           enemyAtkMult,
           nextGroup: () => ++group,
         };

@@ -165,6 +165,50 @@ export class UnitManager {
     return best;
   }
 
+  // Spatial hash for crowd separation (used while charging the finale).
+  private cellHead = new Int32Array(2048).fill(-1);
+  private cellNext = new Int32Array(W.maxUnits);
+
+  /** Push overlapping units apart (O(n) with a spatial hash). */
+  separate(strength = 0.5): void {
+    const n = this.count;
+    const cs = W.unitRadius * 2.2;
+    const head = this.cellHead;
+    const next = this.cellNext;
+    head.fill(-1);
+    const key = (cx: number, cy: number) => ((cx * 73856093) ^ (cy * 19349663)) & 2047;
+    for (let i = 0; i < n; i++) {
+      const u = this.units[i];
+      const k = key(Math.floor(u.x / cs), Math.floor(u.y / cs));
+      next[i] = head[k];
+      head[k] = i;
+    }
+    for (let i = 0; i < n; i++) {
+      const a = this.units[i];
+      const gx = Math.floor(a.x / cs);
+      const gy = Math.floor(a.y / cs);
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          for (let j = head[key(gx + ox, gy + oy)]; j !== -1; j = next[j]) {
+            if (j <= i) continue;
+            const b = this.units[j];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const rr = (a.radius + b.radius) * 0.9;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= rr * rr || d2 < 1e-6) continue;
+            const d = Math.sqrt(d2);
+            const push = ((rr - d) / d) * strength * 0.5;
+            a.x -= dx * push;
+            a.y -= dy * push;
+            b.x += dx * push;
+            b.y += dy * push;
+          }
+        }
+      }
+    }
+  }
+
   /** Compact dead units out, preserving order (stable formation slots). */
   compact(): void {
     if (!this.dirty) return;
@@ -185,9 +229,9 @@ export class UnitManager {
 
   /**
    * Integrate units toward formation slots around (cx, cy).
-   * `frontY` (optional) is a barrier the units press against (finale face).
+   * `frontY` is a barrier the units press against (the finale face).
    */
-  update(dt: number, forward: number, squeezing: boolean, frontY: number, charge: boolean): void {
+  update(dt: number, forward: number, squeezing: boolean, frontY: number, charge = false): void {
     const blend = dt / S.squeezeBlendTime;
     this.squeeze = clamp(this.squeeze + (squeezing ? blend : -blend), 0, 1);
     const sp = this.spacing();
@@ -204,10 +248,14 @@ export class UnitManager {
       u.age += dt;
       if (u.hurt > 0) u.hurt -= dt;
       const tx = this.cx + SLOT_X[i] * sp;
-      let ty = this.cy + SLOT_Y[i] * sp * ys;
-      if (charge) ty = frontY + 20;
       u.vx += ((tx - u.x) * k + (cvx - u.vx) * c) * dt;
-      u.vy += ((ty - u.y) * k - u.vy * c) * dt;
+      if (charge) {
+        // Finale: a steady crowd push into the face; separation forms the queue.
+        u.vy += (110 - u.vy) * Math.min(1, dt * 8);
+      } else {
+        const ty = this.cy + SLOT_Y[i] * sp * ys;
+        u.vy += ((ty - u.y) * k - u.vy * c) * dt;
+      }
       // Cap spring speed so units don't teleport.
       if (u.vy > 420) u.vy = 420;
       if (u.vy < -420) u.vy = -420;
@@ -224,6 +272,14 @@ export class UnitManager {
       if (u.y > frontY - r) {
         u.y = frontY - r;
         if (u.vy > 0) u.vy = 0;
+      }
+    }
+    if (charge) {
+      this.separate(0.9);
+      this.separate(0.9);
+      for (let i = 0; i < this.count; i++) {
+        const u = this.units[i];
+        if (u.y > frontY - u.radius) u.y = frontY - u.radius;
       }
     }
   }

@@ -27,6 +27,8 @@ export interface BuildCtx {
   ref: PlayerStats;
   /** Enemy HP multiplier (power + performance + progression). */
   enemyHpMult: number;
+  /** Enemy HP multiplier the reference player would face (progression only). Used for sizing. */
+  refHpMult: number;
   /** Enemy attack multiplier (progression only). */
   enemyAtkMult: number;
   nextGroup: () => number;
@@ -160,9 +162,14 @@ function gruntAtk(ctx: BuildCtx): number {
   return C.gruntBaseAtk * (ctx.ref.health / 10) * ctx.enemyAtkMult;
 }
 
-/** Units the reference player loses per grunt (continuous contact model). */
+/**
+ * Units the reference player loses per grunt (continuous contact model).
+ * Uses reference HP so formation sizes (the level layout) don't change with
+ * the player's upgrades or mercy — only enemy toughness does.
+ */
 function refLossPerGrunt(ctx: BuildCtx): number {
-  return (gruntHp(ctx) * gruntAtk(ctx)) / (ctx.ref.power * ctx.ref.health);
+  const hp = C.gruntBaseHp * (ctx.ref.power / 10) * ctx.refHpMult;
+  return (hp * gruntAtk(ctx)) / (ctx.ref.power * ctx.ref.health);
 }
 
 function formation(ctx: BuildCtx, kind: EnemyKind, n: number, cx: number, y0: number, cols: number, spacing: number): EntitySpec[] {
@@ -614,7 +621,7 @@ def({
   weight: 1.1,
   hint: { key: 'brute', text: 'BRUTE! Hit it with everything' },
   build: (ctx, i) => {
-    const bruteCost = (gruntHp(ctx) * C.bruteHpMult * gruntAtk(ctx) * C.bruteAtkMult) / (ctx.ref.power * ctx.ref.health);
+    const bruteCost = refLossPerGrunt(ctx) * C.bruteHpMult * C.bruteAtkMult;
     const brutes = clamp(Math.round((ctx.army * lerp(0.25, 0.4, i)) / bruteCost), 1, 3);
     const escorts = Math.round(clamp((ctx.army * 0.1) / refLossPerGrunt(ctx), 0, 12));
     const ents: EntitySpec[] = [hint('brute', 'BRUTE! Hit it with everything')];
