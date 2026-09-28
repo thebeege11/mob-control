@@ -16,7 +16,8 @@
     "cap:ios": "npm run cap:sync && npx cap open ios",
     "cap:android": "npm run cap:sync && npx cap open android",
     "e2e": "node scripts/e2e.mjs",
-    "assets": "node scripts/gen-assets.mjs"
+    "assets": "node scripts/gen-assets.mjs",
+    "build:single": "node scripts/build-artifact.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
