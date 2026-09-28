@@ -12,7 +12,7 @@ import { TUNING, UPGRADE_IDS, type UpgradeId } from '../config/tuning';
 import { clamp } from '../core/math';
 import { Rng } from '../core/rng';
 import type { DailyModifier } from '../gen/types';
-import { WebHaptics } from '../platform/haptics';
+import { WebHaptics, type HapticsProvider } from '../platform/haptics';
 import { LocalStorageBackend, type KeyValueStorage } from '../platform/storage';
 import { Particles } from '../render/Particles';
 import { Renderer, type HudState } from '../render/Renderer';
@@ -38,6 +38,7 @@ type AppState = 'home' | 'playing' | 'paused' | 'ending' | 'result';
 
 export interface GameDeps {
   storage?: KeyValueStorage;
+  haptics?: HapticsProvider & { enabled: boolean };
   ads?: AdProvider;
   store?: StoreProvider;
 }
@@ -50,7 +51,7 @@ export class GameManager {
   readonly analytics = new AnalyticsManager();
   readonly analyticsBuffer = new BufferAnalyticsProvider();
   readonly audio = new AudioManager();
-  readonly haptics = new WebHaptics();
+  readonly haptics: HapticsProvider & { enabled: boolean };
   readonly ads: AdManager;
   readonly purchases: PurchaseManager;
   readonly skins: SkinManager;
@@ -80,11 +81,13 @@ export class GameManager {
   private hud: HudState;
   private lastSoldiers = 0;
   private runStart = 0;
+  private headStart = false;
   /** Debug/demo: `?autoplay` lets the bot drive (used by automated smoke tests). */
   autoplay: BotController | null = null;
 
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement, toastRoot: HTMLElement, deps: GameDeps = {}) {
     this.save = new SaveManager(deps.storage ?? new LocalStorageBackend());
+    this.haptics = deps.haptics ?? new WebHaptics();
     this.currency = new CurrencyManager(this.save);
     this.analytics.addProvider(new ConsoleAnalyticsProvider(false));
     this.analytics.addProvider(this.analyticsBuffer);
@@ -174,6 +177,40 @@ export class GameManager {
     requestAnimationFrame(this.frame);
   }
 
+  /** Android back button. Returns true when handled in-game. */
+  handleBack(): boolean {
+    if (this.state === 'playing') {
+      this.pause();
+      return true;
+    }
+    if (this.state === 'paused') {
+      this.resume();
+      return true;
+    }
+    if (this.ui.current === 'modal') {
+      void this.onAction('close', undefined, document.body);
+      return true;
+    }
+    if (this.state === 'result') {
+      void this.onAction('home', undefined, document.body);
+      return true;
+    }
+    return false;
+  }
+
+  onAppPause(): void {
+    if (this.state === 'playing') this.pause();
+    this.audio.suspend();
+    this.analytics.endSession({ level: this.save.data.level });
+    this.save.save();
+  }
+
+  onAppResume(): void {
+    this.audio.resume();
+    this.retention.touchDay();
+    this.analytics.startSession({ level: this.save.data.level });
+  }
+
   private measureSafeArea(): void {
     const probe = document.createElement('div');
     probe.style.cssText = 'position:fixed;top:0;left:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none';
@@ -184,10 +221,28 @@ export class GameManager {
     probe.remove();
   }
 
+  /** Adaptive resolution: drop render scale on slow devices to hold 60 FPS. */
+  private dprCap = 2;
+  private frameEma = 1 / 60;
+  private slowFrames = 0;
+
+  private adaptQuality(dt: number): void {
+    this.frameEma += (dt - this.frameEma) * 0.05;
+    if (this.state !== 'playing') return;
+    if (this.frameEma > 1 / 45) this.slowFrames++;
+    else this.slowFrames = Math.max(0, this.slowFrames - 1);
+    if (this.slowFrames > 90 && this.dprCap > 1) {
+      this.dprCap = Math.max(1, this.dprCap - 0.5);
+      this.slowFrames = 0;
+      this.resize();
+      this.analytics.track('quality_changed', { dpr: this.dprCap });
+    }
+  }
+
   private resize(): void {
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = Math.min(this.dprCap, window.devicePixelRatio || 1);
     this.renderer.resize(w, h, dpr);
     this.juice.screenTextX = w / 2;
     this.juice.screenTextY = h * 0.4;
@@ -240,6 +295,14 @@ export class GameManager {
     document.body.classList.add('in-game');
     const plan = this.sim.plan;
     this.analytics.track('game_started', { level: plan.level, daily: !!this.dailyRun, difficulty: Math.round(plan.difficulty * 10) / 10 });
+    if (this.headStart) {
+      this.headStart = false;
+      const extra = Math.ceil(plan.player.startUnits * TUNING.economy.headStartSquadBonus);
+      this.sim.units.addSoldiers(extra, 0, this.sim.units.cy, new Rng(plan.seed));
+      this.sim.ability.fill();
+      this.juice.showHint(`HEAD START! +${extra}`);
+      this.analytics.track('boost_used', { level: plan.level, extra });
+    }
     if (!this.save.data.hintsSeen.includes('intro')) {
       this.juice.showHint('DRAG to steer · HOLD to squeeze');
       this.save.data.hintsSeen.push('intro');
@@ -278,6 +341,9 @@ export class GameManager {
       upgrades: this.upgradeCards(),
       dailyAvailable: this.retention.dailyRewardAvailable() || !this.retention.dailyChallenge().done,
       freeCoinsReady: this.ads.freeCoinsReady(),
+      headStart: this.headStart,
+      headStartGemCost: TUNING.economy.headStartGemCost,
+      canAffordHeadStart: this.currency.canAfford('gems', TUNING.economy.headStartGemCost),
       firstTime: d.stats.runs === 0,
       themeName: THEMES[this.sim.plan.theme].name,
     });
@@ -633,6 +699,15 @@ export class GameManager {
           this.ui.refreshUpgrades(this.upgradeCards());
         }
         break;
+      case 'boost-ad':
+      case 'boost-gems':
+        if (this.headStart) break;
+        if (action === 'boost-gems' ? this.currency.spend('gems', TUNING.economy.headStartGemCost) : await this.ads.showRewarded('head_start')) {
+          this.headStart = true;
+          this.audio.play('upgrade');
+          this.showHome();
+        }
+        break;
       case 'revive-ad':
         await this.revive(false);
         break;
@@ -663,6 +738,7 @@ export class GameManager {
     this.last = now;
     if (dt > 0.1) dt = 0.1; // tab switches / hitches: never spiral
     this.realTime += dt;
+    this.adaptQuality(dt);
     const sim = this.sim;
 
     // Slow-motion easing

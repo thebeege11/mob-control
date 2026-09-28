@@ -20,7 +20,9 @@ export type AnalyticsEvent =
   | 'daily_reward_claimed'
   | 'daily_challenge_started'
   | 'skin_equipped'
-  | 'tutorial_hint';
+  | 'tutorial_hint'
+  | 'quality_changed'
+  | 'boost_used';
 
 export type AnalyticsParams = Record<string, string | number | boolean>;
 

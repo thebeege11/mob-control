@@ -189,6 +189,9 @@ export const TUNING = {
     chestGemsMax: 6,
     chestSkinChance: 0.08,
     reviveGemCost: 15,
+    /** Head Start boost: +squad fraction and a full Surge meter for one run. */
+    headStartGemCost: 5,
+    headStartSquadBonus: 0.5,
   },
 
   ability: {

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Swarm Surge</string>
+    <string name="title_activity_main">Swarm Surge</string>
+    <string name="package_name">com.swarmsurge.game</string>
+    <string name="custom_url_scheme">com.swarmsurge.game</string>
+</resources>

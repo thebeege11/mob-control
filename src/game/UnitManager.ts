@@ -76,7 +76,7 @@ export class UnitManager {
       const u = this.units[this.count++];
       u.alive = true;
       u.x = clamp(x + rng.range(-10, 10), -W.trackHalfWidth + 4, W.trackHalfWidth - 4);
-      u.y = y + rng.range(-4, 8);
+      u.y = y + rng.range(0, 8); // never behind y: clones must not re-cross the gate that spawned them
       u.prevY = u.y;
       u.vx = rng.range(-60, 60);
       u.vy = 0;

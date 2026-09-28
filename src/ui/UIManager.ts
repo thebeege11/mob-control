@@ -34,6 +34,9 @@ export interface HomeData {
   freeCoinsReady: boolean;
   firstTime: boolean;
   themeName: string;
+  headStart: boolean;
+  headStartGemCost: number;
+  canAffordHeadStart: boolean;
 }
 
 export interface ResultData {
@@ -144,6 +147,13 @@ export class UIManager {
       <div class="home-center">
         <div class="lvl-badge ${d.isBoss ? 'boss' : ''}">${d.isBoss ? '☠ BOSS · ' : ''}LEVEL ${d.level}</div>
         ${d.bestScore > 0 ? `<div class="best">BEST ${formatNum(d.bestScore)}</div>` : ''}
+        ${
+          d.firstTime
+            ? ''
+            : d.headStart
+              ? `<div class="boost-on">⚡ HEAD START READY</div>`
+              : `<div class="boost-row"><span>HEAD START +50%</span><button class="btn mini ad-btn" data-action="boost-ad">▶ FREE</button><button class="btn mini gem-btn" data-action="boost-gems" ${d.canAffordHeadStart ? '' : 'disabled'}>◆${d.headStartGemCost}</button></div>`
+        }
         <div class="tap-to-play">${d.firstTime ? 'DRAG TO STEER' : 'TAP TO PLAY'}</div>
         <div class="hand"><div class="finger"></div></div>
       </div>

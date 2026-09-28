@@ -2,7 +2,7 @@ import { TUNING } from '../config/tuning';
 import type { AnalyticsManager } from './AnalyticsManager';
 import type { SaveManager } from './SaveManager';
 
-export type RewardedPlacement = 'revive' | 'double_reward' | 'free_coins' | 'chest_boost';
+export type RewardedPlacement = 'revive' | 'double_reward' | 'free_coins' | 'chest_boost' | 'head_start';
 
 /** Implement with AdMob / AppLovin MAX / Unity Ads etc. */
 export interface AdProvider {

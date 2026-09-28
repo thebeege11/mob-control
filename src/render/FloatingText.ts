@@ -81,12 +81,13 @@ export class FloatingText {
       }
       let size = it.size * scale * pop;
       ctx.globalAlpha = Math.min(1, it.life / (it.max * 0.35));
-      ctx.font = `900 ${size.toFixed(1)}px ${FONT}`;
+      if (size < 6) continue;
+      setFont(ctx, size);
       if (it.screen) {
         const w = ctx.measureText(it.text).width;
         if (w > cam.W - 28) {
           size *= (cam.W - 28) / w;
-          ctx.font = `900 ${size.toFixed(1)}px ${FONT}`;
+          setFont(ctx, size);
         }
       }
       ctx.lineWidth = Math.max(3, size * 0.18);
@@ -100,3 +101,21 @@ export class FloatingText {
 }
 
 export const FONT = '"Baloo 2", "Nunito", "Arial Rounded MT Bold", "Segoe UI", system-ui, sans-serif';
+
+/**
+ * Setting ctx.font parses a CSS string (slow on mobile). Quantise sizes to
+ * whole pixels, cache the strings and skip redundant assignments.
+ */
+const fontCache: string[] = [];
+let lastCtx: CanvasRenderingContext2D | null = null;
+let lastFont = '';
+export function setFont(ctx: CanvasRenderingContext2D, px: number): number {
+  const size = Math.max(1, Math.min(200, Math.round(px)));
+  const f = fontCache[size] ?? (fontCache[size] = `900 ${size}px ${FONT}`);
+  if (ctx !== lastCtx || lastFont !== f || ctx.font !== f) {
+    ctx.font = f;
+    lastCtx = ctx;
+    lastFont = f;
+  }
+  return size;
+}

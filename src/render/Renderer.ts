@@ -14,7 +14,7 @@ import { gateStateAt } from '../game/ObstacleManager';
 import type { Simulation } from '../game/Simulation';
 import type { GateKind } from '../gen/types';
 import { Camera, type Projected } from './Camera';
-import { FONT, FloatingText } from './FloatingText';
+import { FloatingText, setFont } from './FloatingText';
 import type { Particles } from './Particles';
 import { SpriteBank, roundRect } from './sprites';
 import { COLORS, type Theme } from './theme';
@@ -376,7 +376,7 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
     if (u.weight > 1 && p.s > 0.6) {
-      ctx.font = `900 ${Math.max(8, 9 * p.s)}px ${FONT}`;
+      setFont(ctx, Math.max(8, 9 * p.s));
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#fff';
@@ -457,7 +457,7 @@ export class Renderer {
       if (!p.visible) continue;
       const txt = String(gn[g]);
       const fs = Math.max(11, 17 * p.s);
-      ctx.font = `900 ${fs}px ${FONT}`;
+      setFont(ctx, fs);
       const w = ctx.measureText(txt).width + fs * 0.9;
       ctx.fillStyle = COLORS.enemyDark;
       roundRect(ctx, p.x - w / 2, p.y - fs * 0.7, w, fs * 1.4, fs * 0.7);
@@ -509,8 +509,9 @@ export class Renderer {
     // Label
     const label = gateLabel(st.kind, st.kind === 'sub' ? g.pool : st.value, g.triggered && st.kind === 'add');
     const m = cam.project((st.x0 + st.x1) / 2, g.y, hgt * 0.5, this.p4);
-    const fs = Math.max(10, Math.min(46, 30 * m.s * Math.min(1, (st.x1 - st.x0) / 90)));
-    ctx.font = `900 ${fs}px ${FONT}`;
+    const fsRaw = Math.min(46, 30 * m.s * Math.min(1, (st.x1 - st.x0) / 90));
+    if (fsRaw < 6) return; // unreadably far: skip text entirely
+    const fs = setFont(ctx, Math.max(8, fsRaw));
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = fs * 0.16;
@@ -800,7 +801,7 @@ export class Renderer {
   private finaleLabel(x: number, y: number, s: number, hp: number, max: number): void {
     const ctx = this.ctx;
     const fs = Math.max(14, 30 * s);
-    ctx.font = `900 ${fs}px ${FONT}`;
+    setFont(ctx, fs);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = fs * 0.2;
@@ -905,7 +906,7 @@ export class Renderer {
       ctx.fillStyle = '#fff';
       ctx.fillRect(mx - 1.5, top - 5, 3, bh + 10);
     }
-    ctx.font = `900 13px ${FONT}`;
+    setFont(ctx, 13);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
     ctx.lineWidth = 3;
@@ -914,7 +915,7 @@ export class Renderer {
     ctx.strokeText(lvl, bx + bw / 2, top + bh / 2 + 1);
     ctx.fillStyle = '#fff';
     ctx.fillText(lvl, bx + bw / 2, top + bh / 2 + 1);
-    ctx.font = `900 20px ${FONT}`;
+    setFont(ctx, 20);
     ctx.textAlign = 'left';
     const icon = sim.plan.isBoss ? '☠' : '♜';
     ctx.strokeText(icon, bx + bw + 8, top + bh / 2);
@@ -924,7 +925,7 @@ export class Renderer {
     // Score + multiplier
     const sy = top + bh + 26;
     ctx.textAlign = 'center';
-    ctx.font = `900 28px ${FONT}`;
+    setFont(ctx, 28);
     ctx.lineWidth = 6;
     const scoreTxt = formatNum(hud.score);
     ctx.strokeText(scoreTxt, W / 2, sy);
@@ -940,14 +941,14 @@ export class Renderer {
       ctx.fillStyle = COMBO_COLORS[Math.min(COMBO_COLORS.length - 1, hud.multiplier - 2)];
       roundRect(ctx, -24, -15, 48, 30, 12);
       ctx.fill();
-      ctx.font = `900 20px ${FONT}`;
+      setFont(ctx, 20);
       ctx.fillStyle = '#fff';
       ctx.fillText(`x${hud.multiplier}`, 0, 1);
       ctx.restore();
     }
     // Coins this run
     ctx.textAlign = 'left';
-    ctx.font = `900 15px ${FONT}`;
+    setFont(ctx, 15);
     const cx0 = hud.leftHanded ? W - 64 : 14;
     ctx.drawImage(this.sprites.coin, cx0, sy - 9, 18, 18);
     ctx.lineWidth = 4;
@@ -960,7 +961,7 @@ export class Renderer {
       const by = sy + 30;
       const name = f.kind === 'boss' ? BOSS_NAMES[f.bossType ?? 'stomper'] : 'FORTRESS';
       ctx.textAlign = 'center';
-      ctx.font = `900 18px ${FONT}`;
+      setFont(ctx, 18);
       ctx.strokeText(name, W / 2, by);
       ctx.fillStyle = f.kind === 'boss' ? '#ff9db5' : '#fff';
       ctx.fillText(name, W / 2, by);
@@ -975,7 +976,7 @@ export class Renderer {
       if (p.visible) {
         const pop = 1 + hud.countPop * 0.35;
         const fs = 24 * pop;
-        ctx.font = `900 ${fs}px ${FONT}`;
+        setFont(ctx, fs);
         const txt = formatNum(hud.soldiers);
         const w = ctx.measureText(txt).width + 22;
         const y = Math.max(sy + 70, p.y - 30);
@@ -1014,10 +1015,10 @@ export class Renderer {
       ctx.arc(x, y, r - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
       ctx.stroke();
       ctx.textAlign = 'center';
-      ctx.font = `900 26px ${FONT}`;
+      setFont(ctx, 26);
       ctx.fillStyle = ready ? COLORS.ink : '#ffe14d';
       ctx.fillText('⚡', x, y - 5);
-      ctx.font = `900 11px ${FONT}`;
+      setFont(ctx, 11);
       ctx.fillText(ready ? 'TAP!' : 'SURGE', x, y + 18);
     }
 
@@ -1030,11 +1031,11 @@ export class Renderer {
       ctx.translate(W / 2, SH * 0.3);
       ctx.scale(scale, scale);
       let hfs = 30;
-      ctx.font = `900 ${hfs}px ${FONT}`;
+      setFont(ctx, hfs);
       const tw = ctx.measureText(hud.hint).width;
       if (tw > W - 32) {
         hfs = Math.max(14, (hfs * (W - 32)) / tw);
-        ctx.font = `900 ${hfs}px ${FONT}`;
+        setFont(ctx, hfs);
       }
       ctx.textAlign = 'center';
       ctx.lineWidth = 7;
